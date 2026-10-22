@@ -1,66 +1,58 @@
-# Yuheng Admin Web
+# Yaoguang 知识库与 Wiki 工作区
 
-[English](README.md) | [Yuheng 概览](../README.md)
+[English](README.md) | [Yaoguang 服务端](https://github.com/Stellar-Enclosure/yaoguang-service)
 
-Yuheng Admin Web 是独立的 React 管理控制台。它只调用 Yuheng Admin API，不直接调用
-Yuheng Engine 业务路由、Tianshu Admin 或 Provider 端点。
+Yaoguang Web 是独立的 React 知识工作区，由 `yaoguang-service` 提供知识库、文档、检索问答和 Wiki API。玉衡的网关分组、接口目录、MCP 与 LLM 配置由独立 [yuheng-web](https://github.com/Stellar-Enclosure/yuheng-web) 维护。
 
-## 认证
+## 功能页面
 
-控制台不持有凭据或 Token。`src/auth/AuthContext.tsx` 使用
-`@stellar-enclosure/stellar-enclosure-web-shared` 的 `createGatewayAuthClient`；登录跳转到配置的 Edge OIDC
-registration（`/oauth2/authorization/edge-ui`）。Edge 在服务端保管 OAuth Token，并给浏览器
-`HttpOnly` 会话 Cookie。浏览器读取 Edge BFF 会话，用其 CSRF 响应发起退出，并通过 Edge 会话发送后续
-API 请求；不会提交租户、用户名或密码，也不会保存 AT/RT。
+| 路由 | 当前功能 |
+|---|---|
+| `/knowledge` | 查询/创建当前用户可见的知识库 |
+| `/knowledge/:kbId` | 知识库模型与出站策略配置、成员维护、文档上传/版本/重建、任务状态/重试、带引用的检索问答 |
+| `/knowledge/:kbId/wiki/:pageId` | Wiki 阅读、草稿编辑、修订/证据与关联图、发布和下线 |
 
-Actor 与 capabilities 来自 `GET /api/v1/auth/bootstrap`（`GatewayAuthBootstrapController`，该接口
-本身要求 `yuheng:read` 权限）。Provider 在挂载时、每次登录成功后调用它，并可通过
-`refreshAuthorization()` 再次刷新。`CapabilityProvider` 把返回的 `permissions` 列表转成能力集合，
-`hasCapability` 同时接受 `*` 通配。退出登录通过 Edge BFF 的 CSRF 保护端点清理本地会话与授权状态。
-bootstrap 失败时 `RequireAuth` 跳转 `/login`，`RequireCapability` 依据同一列表渲染 403。Admin Web
-从不发送 actor identity header。
+路由以 [src/app/App.tsx](src/app/App.tsx) 为准。业务页面位于 [knowledge](src/features/knowledge/) 与 [wiki](src/features/wiki/)，类型化客户端位于 [knowledge.ts](src/api/knowledge.ts) 与 [wiki.ts](src/api/wiki.ts)。问答支持 `VECTOR`、`KEYWORD`、`HYBRID` 检索和 `DOCUMENTS`、`WIKI`、`BOTH` 取证范围；知识库成员角色为 `READER`、`EDITOR`、`OWNER`。
 
-## 开发
+## 认证与 API 边界
+
+控制台通过共享 SDK 的 `createGatewayAuthClient` 使用 Edge BFF 会话。默认 OIDC registration 是 `edge-yaoguang`，由 `VITE_YAOGUANG_OAUTH_REGISTRATION_ID` 覆盖。Edge 在服务端保管 OAuth Token，浏览器使用 HttpOnly Cookie 和受 CSRF 保护的退出接口，不保存 AT/RT。
+
+授权上下文来自 `GET /api/v1/yaoguang/auth/bootstrap`。页面要求 `yuheng:knowledge:read`；写入、发布、下线等操作继续受服务端 capability 与知识库成员权限约束。业务 API 仍使用 `/api/v1/yuheng/admin` 前缀与 `yuheng:knowledge:*` 权限名，这是拆仓后保留的兼容合同；不表示浏览器应调用 Yuheng Admin。
+
+## 开发与验证
+
+Node 24/npm 11、SDK 依赖初始化与打包说明见 [仓库构建入口](README.md#build-and-test)。依赖可用后执行：
 
 ```bash
-npm ci
 npm run typecheck
 npm test -- --run
 npm run lint
 npm run build
 ```
 
-`npm run dev` 绑定 `127.0.0.1:18141` 且 `strictPort`，并把 `/oauth2`、`/bff` 和 `/login/oauth2`
-OIDC 回调代理到 Edge 对外入口，把 `/api` 代理到 Yuheng Admin。上游可分别用 `YUHENG_AUTH_PROXY` 和 `YUHENG_ADMIN_PROXY` 覆盖；认证
-上游应指向 Edge。Yuheng Admin 仍校验签名 Token 并执行 Tianquan-Jianshen 授权判定。
+操作者显式执行 `npm run dev` 时，Vite 绑定 `127.0.0.1:18145`，启用 `strictPort`。`/oauth2`、`/bff`、`/login/oauth2` 代理由 `YUHENG_AUTH_PROXY` 指定，`/api` 由 `YUHENG_ADMIN_PROXY` 指定；默认均为 `http://127.0.0.1:18180`，应接入能正确路由到 Yaoguang 的 Edge 入口。
 
-`npm run e2e` 通过 Playwright 针对 `http://127.0.0.1:4173` 执行；若无进程监听，会自动启动
-`npm run dev -- --host 127.0.0.1 --port 4173`。用例会mock OIDC入口与管理API响应，用于验证浏览器
-接线，不证明真实Edge、授权服务器、Redis会话或Yuheng拓扑可用。
+`npm run e2e` 是单独的浏览器验证入口，可能启动预览/开发服务；普通构建和单元测试不执行它。Mock API 或隔离组件测试不证明真实 OAuth、文档索引、模型调用或数据库可用。
 
-## 运行时配置
+## 部署与配置
 
-Bundle 只读取 `VITE_YUHENG_ORIGIN` 这一个 Origin 变量，留空时请求保持在当前 Origin——这就是开发
-代理和容器代理都无需重新构建即可生效的原因。登录不从浏览器读取租户标识。
+通过 `VITE_BASE_PATH` 可以独立部署或挂载到 Portal 的 `/apps/yaoguang/`。Portal 业务入口是 `/xingyuan/yaoguang/knowledge`；构建产物为 `dist/`。
 
-镜像内 `static-server.mjs` 提供 `/app/dist` 静态资源、响应 `/healthz`，并把 `/api/*` 反向代理到
-`YUHENG_ADMIN_API_BASE_URL`（默认 `http://stellar-enclosure-yuheng-admin:18080`）。上游为 `http:` 时还必须显式设置
-`YUHENG_ADMIN_API_DEVELOPMENT_PLAINTEXT=true`；上游为 `https:` 时需要
-`YUHENG_ADMIN_API_TLS_CA_PATH`、`YUHENG_ADMIN_API_TLS_CERTIFICATE_PATH` 和
-`YUHENG_ADMIN_API_TLS_PRIVATE_KEY_PATH`。`PORT` 默认 `8080`。
+当前实现保留以下 `YUHENG_*` 配置名，部署时仍应使用这些名称：
 
-作用域是页面自己的查询条件。每个页面通过 `hooks/scopeSearchParams.ts` 把选中的 `bizCode`、
-`namespace`、`env`、`appCode` 保存在本页面 URL 中，页面之间切换不会再因为共享筛选条件而隐藏其他
-作用域的数据。跨作用域页面先加载当前账号有权限的完整结果集，再在页面内筛选。
-`GET /api/v1/yuheng/admin/scopes` 只用于填充页面控件和创建表单，不再作为全局顶部上下文。
+| 配置 | 用途 |
+|---|---|
+| `VITE_YUHENG_ORIGIN` | 构建时 API/BFF Origin，留空使用当前 Origin |
+| `VITE_YAOGUANG_OAUTH_REGISTRATION_ID` | 知识工作区登录 registration，默认 `edge-yaoguang` |
+| `YUHENG_AUTH_PROXY`、`YUHENG_ADMIN_PROXY` | Vite 开发代理的认证与 API 上游 |
+| `YUHENG_ADMIN_API_BASE_URL` | `static-server.mjs` 的 `/api` 上游；源码默认 `http://yuheng-admin:18080`，Yaoguang 部署必须显式配置到合适的 API 入口 |
+| `YUHENG_ADMIN_API_DEVELOPMENT_PLAINTEXT` | 使用 HTTP 上游时必须显式为 `true` |
+| `YUHENG_ADMIN_API_TLS_CA_PATH`、`YUHENG_ADMIN_API_TLS_CERTIFICATE_PATH`、`YUHENG_ADMIN_API_TLS_PRIVATE_KEY_PATH` | HTTPS 上游的 CA 与客户端证书/私钥文件 |
+| `PORT` | static-server 端口，默认 `8080` |
 
-Dashboard 和 Provider 页面要求四个字段完整；Trace 和 Audit 页面要求 `env`、`namespace`；
-网关分组、MCP Server、Remote Provider 页面使用可选的 `env`、`namespace` 筛选；接口目录、
-Applications、OpenAPI Sync 与 MCP Resource/Prompt 页面使用完整的可选作用域筛选。
-
-不要把凭据写入并提交的 `.env` 文件。TLS 终止、Engine 侧针对非安全方法的 Cookie 可信 Origin
-白名单，以及 Yuheng Admin 授权策略仍由部署平台负责。
+static-server 只提供静态站点、`/healthz` 与 `/api` 反向代理。生产入口还需由部署环境正确转发 OIDC/BFF 路径并保持 Cookie、Origin 和 Resource 绑定。不要把凭据提交到 `.env` 文件。
 
 ## 独立仓库发布
 
-发布范围、前置配置、校验与发布命令见 [仓库 README](README.md#application-delivery-no-package-publication)。应用和测试示例不发布到 Maven Central，前端站点保持 `private: true`。
+[交付说明](README.md#application-delivery-no-package-publication)保留完整的初始化、校验与构建入口。本仓库是 `private: true` 的前端应用，不发布到 npm 或 Maven Central；SDK 发布由 web-sdk 独立负责。

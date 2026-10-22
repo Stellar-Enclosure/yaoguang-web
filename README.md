@@ -1,6 +1,20 @@
 # yaoguang-web
 
-Stellar Enclosure frontend. All first-party modules start at **0.0.1**.
+[English](README.md) | [中文](README.zh-CN.md)
+
+React knowledge-base and Wiki workspace for Stellar Enclosure's Yaoguang platform. All first-party modules start at **0.0.1**.
+
+## Pages and capabilities
+
+| Route | Function |
+|---|---|
+| `/knowledge` | Browse/create knowledge bases and open workspaces visible to the current user. |
+| `/knowledge/:kbId` | Configure a knowledge base and members, upload/manage document revisions, inspect/retry jobs, request reindexing and ask questions with cited evidence. |
+| `/knowledge/:kbId/wiki/:pageId` | Read/edit Wiki pages, inspect revisions and evidence/relationships, publish and unpublish according to capabilities. |
+
+Page entry points are in [src/app/App.tsx](src/app/App.tsx), [knowledge features](src/features/knowledge/) and [Wiki features](src/features/wiki/). [Knowledge](src/api/knowledge.ts) and [Wiki](src/api/wiki.ts) clients retain the existing `/api/v1/yuheng/admin` API prefix while calling [yaoguang-service](https://github.com/Stellar-Enclosure/yaoguang-service).
+
+The workspace uses Edge registration `edge-yaoguang`, `/api/v1/yaoguang/auth/bootstrap` and existing `yuheng:knowledge:*` capabilities. Access is checked both by capability and knowledge-base membership. The browser holds the BFF session rather than OAuth tokens. Yuheng gateway/MCP/LLM administration is owned by [yuheng-web](https://github.com/Stellar-Enclosure/yuheng-web); this repository currently implements the knowledge/Wiki portion of Yaoguang's broader roadmap.
 
 ## Build and test
 

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "application": {
+    "businessCode": "xingyuan",
+    "applicationCode": "yaoguang"
+  },
+  "producerId": "yaoguang-web",
+  "ownedKeyPrefixes": [
+    "yaoguang.app.",
+    "yaoguang.menu.",
+    "yaoguang.page.",
+    "yaoguang.button."
+  ],
+  "expectedModules": [
+    "console"
+  ],
+  "modules": {
+    "console": {
+      "entryPoints": [
+        "src/permissions/permissions.ts",
+        "src/permissions/resources.ts",
+        "src/permissions/fieldReferences.ts"
+      ]
+    }
+  },
+  "artifact": {
+    "repository": "yaoguang-web",
+    "commit": "e831a74b9c50fbe9df45c4550ddf0cde52b289aa",
+    "buildId": "local-source",
+    "version": "0.0.1"
+  },
+  "tsconfig": "tsconfig.app.json",
+  "toolchainLock": "permission-toolchain.lock.json"
+}

@@ -1,3 +1,4 @@
+import {useWritableFields} from '../../permissions/FieldCatalog'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   Alert,
@@ -48,7 +49,9 @@ export const WikiPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const revisionId = searchParams.get('revision') ?? undefined
   const queryClient = useQueryClient()
-  const canWrite = useCapability('yuheng:knowledge:write')
+  const draftFields = useWritableFields('WikiDraftWriteCommandDTO', 'WikiSourceWriteDTO')
+  const publicationFields = useWritableFields('WikiPublicationCommandDTO')
+  const canWrite = useCapability('yaoguang.button.WikiPage.canWrite')
   const [draft, setDraft] = useState<DraftState>()
 
   const kb = useQuery({
@@ -68,7 +71,7 @@ export const WikiPage = () => {
   })
 
   const membership = kb.data?.myRole
-  const canEdit = canWrite && (membership === 'EDITOR' || membership === 'OWNER')
+  const canEdit = canWrite && draftFields && (membership === 'EDITOR' || membership === 'OWNER')
 
   const clearSensitiveCache = () => {
     setDraft(undefined)
@@ -208,7 +211,7 @@ export const WikiPage = () => {
                 onChange={(event) => setDraft({...view, title: event.target.value})}
               />
               <Input.TextArea
-                aria-label="Markdown 正文"
+                aria-label="Markdown 正文" disabled={!canEdit}
                 rows={16}
                 value={view.markdown}
                 onChange={(event) => setDraft({...view, markdown: event.target.value})}
@@ -226,7 +229,7 @@ export const WikiPage = () => {
                 <Button
                   type="primary"
                   loading={saveDraft.isPending}
-                  disabled={saveDraft.isPending || !view.markdown.trim()}
+                  disabled={!canEdit || saveDraft.isPending || !view.markdown.trim()}
                   onClick={() => saveDraft.mutate(view)}
                 >
                   保存草稿
@@ -252,12 +255,12 @@ export const WikiPage = () => {
               description="DIRECT 策略无需人工审核，发布后立即对有权成员可见。"
               okText="确认发布"
               onConfirm={() => publish.mutate()}
-              disabled={!canEdit || !current.draftRevisionId}
+              disabled={!canWrite || !publicationFields || !current.draftRevisionId}
             >
               <Button
                 type="primary"
                 loading={publish.isPending}
-                disabled={!canEdit || !current.draftRevisionId || publish.isPending}
+                disabled={!canWrite || !publicationFields || !current.draftRevisionId || publish.isPending}
                 title={current.draftRevisionId ? undefined : '没有待发布草稿'}
               >
                 直接发布

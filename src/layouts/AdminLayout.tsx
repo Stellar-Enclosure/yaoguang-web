@@ -1,3 +1,5 @@
+import {usePermission} from '@stellar-enclosure/stellar-enclosure-web-shared/react-permissions'
+import {resources} from '../permissions/resources'
 import {LogoutOutlined, ReadOutlined} from '@ant-design/icons'
 import {Badge, Space} from 'antd'
 import {useQueryClient} from '@tanstack/react-query'
@@ -9,7 +11,7 @@ import {
 import {Outlet, useNavigate} from 'react-router-dom'
 import {version} from '../../package.json'
 import {useAuth} from '../auth/AuthContext'
-import {type Capability, useCapability} from '../app/capabilities'
+import {type Capability} from '../app/capabilities'
 
 // 平台自己的导航树，由 capability 递归剪枝后交给 shared 左侧树。
 interface GatewayNavItem {
@@ -31,9 +33,9 @@ const navigation: readonly GatewayNavItem[] = [
     key: 'knowledge',
     icon: <ReadOutlined />,
     label: '企业知识',
-    capability: 'yuheng:knowledge:read',
+    capability: 'yaoguang.menu.group1',
     children: [
-      {key: '/knowledge', path: '/knowledge', activePathPrefixes: ['/knowledge'], icon: <ReadOutlined />, label: '知识库', capability: 'yuheng:knowledge:read'},
+      {key: '/knowledge', path: '/knowledge', activePathPrefixes: ['/knowledge'], icon: <ReadOutlined />, label: '知识库', capability: 'yaoguang.menu.knowledge'},
     ],
   },
 ]
@@ -42,13 +44,10 @@ export const AdminLayout = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const auth = useAuth()
-  // 能力必须在渲染顶层逐个显式订阅（不能在循环里调用 Hook），再交给导航剪枝。
-  const canReadKnowledge = useCapability('yuheng:knowledge:read')
+  const permission = usePermission(auth.authorization?.snapshot ?? null, auth.authorization?.binding ?? null)
 
   const embedded = (window as WujieRuntimeWindow).$wujie?.props?.embedded === true
-  const items: EnterpriseNavigationItem[] = filterNavigation(navigation, {
-    'yuheng:knowledge:read': canReadKnowledge,
-  })
+  const items: EnterpriseNavigationItem[] = filterNavigation(navigation, Object.fromEntries(resources.map(resource => [resource.key, permission.allows('requirement' in resource ? resource.requirement : {access: resource.access})])))
 
   const config: EnterpriseLayoutConfig = {
     platformName: 'Yaoguang Admin',

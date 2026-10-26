@@ -1,3 +1,4 @@
+import {useWritableFields, useUploadFieldsWritable} from '../../permissions/FieldCatalog'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   Alert,
@@ -48,8 +49,14 @@ export const KnowledgeBasePage = () => {
   const {kbId = ''} = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  const canWrite = useCapability('yuheng:knowledge:write')
-  const canAdmin = useCapability('yuheng:knowledge:admin')
+  const settingsFields = useWritableFields('KnowledgeBaseCommandDTO')
+  const memberFields = useWritableFields('KnowledgeMembersReplaceCommandDTO', 'KnowledgeMemberWriteDTO')
+  const uploadFields = useUploadFieldsWritable(false)
+  const updateUploadFields = useUploadFieldsWritable(true)
+  const reindexFields = useWritableFields('KnowledgeReindexCommandDTO')
+  const generateFields = useWritableFields('WikiGenerationCommandDTO')
+  const canWrite = useCapability('yaoguang.button.KnowledgeBasePage.canWrite')
+  const canAdmin = useCapability('yaoguang.button.KnowledgeBasePage.canAdmin')
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadTarget, setUploadTarget] = useState<KnowledgeDocument>()
   const [file, setFile] = useState<File>()
@@ -230,7 +237,7 @@ export const KnowledgeBasePage = () => {
                 <Space wrap>
                   <Button
                     type="primary"
-                    disabled={!isEditor || upload.isPending}
+                    disabled={!isEditor || !uploadFields || upload.isPending}
                     title={isEditor ? undefined : '当前角色不能上传资料'}
                     onClick={() => setUploadOpen(true)}
                   >
@@ -273,7 +280,7 @@ export const KnowledgeBasePage = () => {
                           <Space wrap>
                             <Button
                               size="small"
-                              disabled={!isEditor || !record.activeRevisionId || reindex.isPending}
+                              disabled={!isEditor || !reindexFields || !record.activeRevisionId || reindex.isPending}
                               onClick={() => reindex.mutate(record)}
                             >
                               重建索引
@@ -306,7 +313,7 @@ export const KnowledgeBasePage = () => {
                 <Space wrap>
                   <Button
                     type="primary"
-                    disabled={!isEditor || generate.isPending}
+                    disabled={!isEditor || !generateFields || generate.isPending}
                     onClick={() => setGenerateOpen(true)}
                   >
                     生成页面
@@ -378,7 +385,7 @@ export const KnowledgeBasePage = () => {
                 )}
                 <Form<SettingsForm>
                   layout="vertical"
-                  disabled={!isOwner}
+                  disabled={!isOwner || !settingsFields}
                   initialValues={{
                     name: kb.data.name,
                     description: kb.data.description,
@@ -423,7 +430,7 @@ export const KnowledgeBasePage = () => {
                   <MembersEditor
                     kbId={kbId}
                     members={members.data?.members ?? []}
-                    disabled={saveMembers.isPending}
+                    disabled={!memberFields || saveMembers.isPending}
                     onSave={(values) => saveMembers.mutate(values)}
                   />
                 )}
@@ -450,7 +457,7 @@ export const KnowledgeBasePage = () => {
         extra={(
           <Button
             type="primary"
-            disabled={!file || upload.isPending}
+            disabled={!isEditor || !(uploadTarget?.id ? updateUploadFields : uploadFields) || !file || upload.isPending}
             loading={upload.isPending}
             onClick={() => file && upload.mutate({
               file,
@@ -480,11 +487,13 @@ export const KnowledgeBasePage = () => {
           <Input
             type="file"
             aria-label="资料文件"
+            disabled={!isEditor || !uploadFields}
             accept=".md,.txt,.pdf,.docx,.xlsx"
             onChange={(event) => setFile(event.target.files?.[0])}
           />
           <Input
             aria-label="更新资料编号"
+            disabled={!isEditor || !uploadFields}
             placeholder="留空表示新建资料"
             value={uploadTarget?.id ?? ''}
             onChange={(event) => setUploadTarget((current) => ({
@@ -509,12 +518,12 @@ export const KnowledgeBasePage = () => {
         width={520}
         onClose={() => setGenerateOpen(false)}
         extra={(
-          <Button type="primary" loading={generate.isPending} onClick={() => generateForm.submit()}>
+          <Button type="primary" disabled={!isEditor || !generateFields} loading={generate.isPending} onClick={() => generateForm.submit()}>
             提交生成
           </Button>
         )}
       >
-        <Form form={generateForm} layout="vertical" onFinish={(values) => generate.mutate(values)}>
+        <Form disabled={!isEditor || !generateFields} form={generateForm} layout="vertical" onFinish={(values) => generate.mutate(values)}>
           <Form.Item
             name="sourceRevisionIds"
             label="来源版本"

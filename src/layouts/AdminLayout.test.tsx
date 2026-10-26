@@ -1,3 +1,4 @@
+import {authorizationFixture} from '../test/permissionFixtures'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {cleanup, render, screen} from '@testing-library/react'
 import {MemoryRouter, Route, Routes} from 'react-router-dom'
@@ -7,10 +8,7 @@ import {AdminLayout} from './AdminLayout'
 const mocks = vi.hoisted(() => ({logout: vi.fn(), canRead: true}))
 type WujieTestWindow = Window & {$wujie?: {props?: {embedded?: boolean}}}
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({authorization: {user: {identitySub: 'Admin'}}, logout: mocks.logout}),
-}))
-vi.mock('../app/capabilities', () => ({
-  useCapability: (capability: string) => capability === 'yuheng:knowledge:read' && mocks.canRead,
+  useAuth: () => ({authorization: authorizationFixture('yaoguang', mocks.canRead ? ['yuheng:knowledge:read'] : []), logout: mocks.logout}),
 }))
 const renderLayout = (path = '/knowledge', embedded = false) => {
   ;(window as WujieTestWindow).$wujie = embedded ? {props: {embedded: true}} : undefined

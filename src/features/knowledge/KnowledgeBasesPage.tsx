@@ -1,3 +1,4 @@
+import {useWritableFields} from '../../permissions/FieldCatalog'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Alert, Button, Card, Form, Input, Modal, Select, Space, Table, Typography} from 'antd'
 import {useState} from 'react'
@@ -18,7 +19,8 @@ type CreateForm = KnowledgeBaseCommand
 export const KnowledgeBasesPage = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const canCreate = useCapability('yuheng:knowledge:write')
+  const createFields = useWritableFields('KnowledgeBaseCreateCommandDTO')
+  const canCreate = useCapability('yaoguang.button.KnowledgeBasesPage.canCreate') && createFields
   const [name, setName] = useState('')
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm<CreateForm>()
@@ -100,6 +102,7 @@ export const KnowledgeBasesPage = () => {
         onCancel={() => setOpen(false)}
         onOk={() => form.submit()}
         confirmLoading={create.isPending}
+        okButtonProps={{disabled: !canCreate}}
         destroyOnHidden
       >
         {create.isError && (
@@ -111,6 +114,7 @@ export const KnowledgeBasesPage = () => {
           />
         )}
         <Form<CreateForm>
+          disabled={!canCreate}
           form={form}
           layout="vertical"
           onFinish={(values) => create.mutate(values)}

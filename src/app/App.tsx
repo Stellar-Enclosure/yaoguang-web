@@ -1,3 +1,4 @@
+import {FieldCatalogProvider} from '../permissions/FieldCatalog'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {ConfigProvider, Result} from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -34,7 +35,7 @@ const WorkspaceAuthBoundary = () => {
   useEffect(() => () => { queryClient.clear() }, [])
   return (
     <AuthProvider resource="yaoguang">
-      <CapabilityProvider><Outlet /></CapabilityProvider>
+      <FieldCatalogProvider><CapabilityProvider><Outlet /></CapabilityProvider></FieldCatalogProvider>
     </AuthProvider>
   )
 }
@@ -46,9 +47,9 @@ const router = createBrowserRouter([{element: <WorkspaceAuthBoundary />, childre
     errorElement: <Result status="error" title="页面加载失败" subTitle="请返回上一页或刷新。" />,
     children: [
       {index: true, element: <Navigate replace to="/knowledge" />},
-      {path: 'knowledge', element: guarded('yuheng:knowledge:read', <KnowledgeBasesPage />)},
-      {path: 'knowledge/:kbId', element: guarded('yuheng:knowledge:read', <KnowledgeBasePage />)},
-      {path: 'knowledge/:kbId/wiki/:pageId', element: guarded('yuheng:knowledge:read', <WikiPage />)},
+      {path: 'knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeBasesPage />)},
+      {path: 'knowledge/:kbId', element: guarded('yaoguang.page.knowledge.kbId', <KnowledgeBasePage />)},
+      {path: 'knowledge/:kbId/wiki/:pageId', element: guarded('yaoguang.page.knowledge.kbId.wiki.pageId', <WikiPage />)},
       {path: '*', element: <Result status="404" title="404" subTitle="页面不存在" />},
     ],
   },

@@ -1,3 +1,4 @@
+import {useWritableFields} from '../../permissions/FieldCatalog'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Alert, Button, Descriptions, Select, Space, Table, Tag} from 'antd'
 import {useEffect, useState} from 'react'
@@ -30,7 +31,8 @@ const useDocumentVisible = (): boolean => {
 
 export const KnowledgeJobsPanel = ({ kbId }: { kbId: string }) => {
   const queryClient = useQueryClient()
-  const canRetry = useCapability('yuheng:knowledge:write')
+  const retryFields = useWritableFields('KnowledgeRetryCommandDTO')
+  const canRetry = useCapability('yaoguang.button.KnowledgeJobsPanel.canRetry') && retryFields
   const visible = useDocumentVisible()
   const [status, setStatus] = useState<string>()
   const [selectedJobId, setSelectedJobId] = useState<string>()

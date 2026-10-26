@@ -1,3 +1,5 @@
+vi.mock('../../permissions/FieldCatalog', () => ({useWritableFields: () => true, useUploadFieldsWritable: () => true}))
+import {authorizationFixture} from '../../test/permissionFixtures'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react'
 import {MemoryRouter, Route, Routes} from 'react-router-dom'
@@ -25,7 +27,7 @@ vi.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({
     loading: false,
     error: undefined,
-    authorization: {permissions: grants.current},
+    authorization: authorizationFixture('yaoguang', grants.current),
     login: vi.fn(),
     logout: vi.fn(),
     refreshAuthorization: vi.fn(),

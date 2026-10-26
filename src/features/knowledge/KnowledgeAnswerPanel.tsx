@@ -1,3 +1,4 @@
+import {useWritableFields} from '../../permissions/FieldCatalog'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   Alert,
@@ -32,6 +33,7 @@ const isForbidden = (error: unknown): boolean =>
 
 // 正文一律按纯文本渲染（不用 dangerouslySetInnerHTML）；引用可追溯到冻结版本与 hash。
 export const KnowledgeAnswerPanel = ({ kbId }: { kbId: string }) => {
+  const answerFields = useWritableFields('KnowledgeAnswerCommandDTO')
   const queryClient = useQueryClient()
   const [form] = Form.useForm<AskForm>()
   const [result, setResult] = useState<KnowledgeAnswer>()
@@ -70,6 +72,7 @@ export const KnowledgeAnswerPanel = ({ kbId }: { kbId: string }) => {
     <Space direction="vertical" size="middle" style={{width: '100%'}}>
       <Card title="基于授权资料与 Wiki 提问">
         <Form<AskForm>
+          disabled={!answerFields}
           form={form}
           layout="vertical"
           initialValues={{sourceMode: 'BOTH', topK: 8, searchMode: 'VECTOR'}}
@@ -102,7 +105,7 @@ export const KnowledgeAnswerPanel = ({ kbId }: { kbId: string }) => {
               />
             </Form.Item>
           </Space>
-          <Button type="primary" htmlType="submit" loading={ask.isPending} disabled={ask.isPending}>
+          <Button type="primary" htmlType="submit" loading={ask.isPending} disabled={!answerFields || ask.isPending}>
             提交问题
           </Button>
         </Form>

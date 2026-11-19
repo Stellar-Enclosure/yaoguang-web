@@ -3,11 +3,11 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "@egon-cola/stellar-enclosure-yuheng-admin-web",
+      "name": "@stellar-enclosure/stellar-enclosure-yaoguang-web",
       "dependencies": {
         "@ant-design/charts": "^2.6.7",
         "@ant-design/icons": "^6.3.2",
-        "@stellar-enclosure/stellar-enclosure-web-shared": "npm:@stellar-enclosure/stellar-enclosure-web-shared@^0.2.4",
+        "@stellar-enclosure/stellar-enclosure-web-shared": "0.1.0",
         "@tanstack/react-query": "^5.101.4",
         "antd": "^6.5.2",
         "i18next": "^24.0.0",
@@ -161,7 +161,7 @@
 
     "@csstools/css-tokenizer": ["@csstools/css-tokenizer@4.0.0", "", {}, "sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA=="],
 
-    "@stellar-enclosure/stellar-enclosure-web-shared": ["@stellar-enclosure/stellar-enclosure-web-shared@0.2.4", "", { "peerDependencies": { "@ant-design/icons": "^6.3.2", "@tanstack/react-query": "^5.101.4", "antd": "^6.5.2", "i18next": "^24.0.0", "react": "^19.2.8", "react-dom": "^19.2.8", "react-i18next": "^15.0.0", "react-router-dom": "^7.18.0" } }, "sha512-iGM7nfou3WmEjnPsAgYvXScnQ1eDkQYHnJlStcgQaBH/OfU65PFVtqm6Usi31oByXE5P9rkBMmlduJw5GMvXnA=="],
+    "@stellar-enclosure/stellar-enclosure-web-shared": ["@stellar-enclosure/stellar-enclosure-web-shared@0.1.0", "", {"peerDependencies": {"@ant-design/icons": "^6.3.2", "@tanstack/react-query": "^5.101.4", "antd": "^6.5.2", "i18next": "^24.0.0", "react": "^19.2.8", "react-dom": "^19.2.8", "react-i18next": "^15.0.0", "react-router-dom": "^7.18.0"}}, "sha512-HgY6UuvGMLY1uQmDVW9RytKs4ljKrUiZy9v3qG0disASmQqZyjTdXkmcIT/Fpdb8Oz/qEtevlp17sUzLjN8fvA=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ=="],
 

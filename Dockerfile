@@ -1,7 +1,6 @@
 FROM node:24-alpine
 
 ENV PORT=8080
-ENV YUHENG_EDGE_BASE_URL=http://edge:18180
 
 WORKDIR /app
 COPY --chown=node:node dist /app/dist

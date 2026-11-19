@@ -2,7 +2,6 @@ import {usePermission} from '@stellar-enclosure/stellar-enclosure-web-shared/rea
 import {resources} from '../permissions/resources'
 import {LogoutOutlined, ReadOutlined} from '@ant-design/icons'
 import {Badge, Space} from 'antd'
-import {useQueryClient} from '@tanstack/react-query'
 import {
     EnterpriseLayout,
     type EnterpriseLayoutConfig,
@@ -42,7 +41,6 @@ const navigation: readonly GatewayNavItem[] = [
 
 export const AdminLayout = () => {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const auth = useAuth()
   const permission = usePermission(auth.authorization?.snapshot ?? null, auth.authorization?.binding ?? null)
 
@@ -63,13 +61,17 @@ export const AdminLayout = () => {
           menu: [
             {
               key: 'logout',
-              label: '退出登录',
+              label: '退出摇光',
               icon: <LogoutOutlined />,
               onClick: () => {
                 void auth.logout()
-                queryClient.clear()
                 navigate('/login', { replace: true })
               },
+            },
+            {
+              key: 'logout-sso',
+              label: '退出统一身份',
+              onClick: () => { void auth.logout(true) },
             },
           ],
         }

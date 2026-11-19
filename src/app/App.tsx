@@ -1,12 +1,13 @@
 import {FieldCatalogProvider} from '../permissions/FieldCatalog'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
-import {ConfigProvider, Result} from 'antd'
+import {Button, ConfigProvider, Result} from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import {lazy, Suspense, useEffect, type ReactNode} from 'react'
-import {createBrowserRouter, Navigate, Outlet, RouterProvider} from 'react-router-dom'
+import {lazy, Suspense, useEffect, useState, type ReactNode} from 'react'
+import {createBrowserRouter, Link, Navigate, Outlet, RouterProvider, useNavigate, useParams} from 'react-router-dom'
 import {CapabilityProvider, type Capability} from './capabilities'
 import {AuthProvider} from '../auth/AuthContext'
 import {LoginPage} from '../auth/LoginPage'
+import {LOGIN_CALLBACK, POPUP_CALLBACK, STANDALONE_LOGIN, workspaceOAuth} from '../auth/authTransport'
 import {RequireAuth, RequireCapability} from '../auth/RouteGuards'
 import {LoadingBlock} from '../components/QueryState'
 import {AdminLayout} from '../layouts/AdminLayout'
@@ -32,14 +33,50 @@ const guarded = (capability: Capability, node: ReactNode) => (
   <RequireCapability capability={capability}>{node}</RequireCapability>
 )
 const WorkspaceAuthBoundary = () => {
-  useEffect(() => () => { queryClient.clear() }, [])
   return (
     <AuthProvider resource="yaoguang">
       <FieldCatalogProvider><CapabilityProvider><Outlet /></CapabilityProvider></FieldCatalogProvider>
     </AuthProvider>
   )
 }
-const router = createBrowserRouter([{element: <WorkspaceAuthBoundary />, children: [
+function OAuthCallback({popup = false}: {readonly popup?: boolean}) {
+  const [url] = useState(() => window.location.href)
+  const [status, setStatus] = useState<'pending' | 'done' | 'failed'>('pending')
+  const navigate = useNavigate()
+  useEffect(() => {
+    let active = true
+    void workspaceOAuth.completeCallback(url, popup).then(returnTo => {
+      if (!active) return
+      if (returnTo) void navigate(returnTo, {replace: true})
+      else setStatus('done')
+    }, () => {if (active) setStatus('failed')})
+    return () => {active = false}
+  }, [url, popup, navigate])
+  const title = status === 'failed' ? '统一身份回调失败' : status === 'done' ? '授权完成，可以关闭此窗口' : '正在完成统一身份授权'
+  return <Result status={status === 'failed' ? 'error' : 'info'} title={title}
+    extra={status === 'failed' && !popup ? <Link to="/login">返回摇光</Link> : undefined} />
+}
+
+function StandaloneLogin() {
+  const {registrationId = ''} = useParams()
+  const [pending, setPending] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const start = async () => {
+    setFailed(false)
+    setPending(true)
+    try { await workspaceOAuth.loginStandalone(registrationId) }
+    catch { setFailed(true) }
+    finally { setPending(false) }
+  }
+  return <Result status={failed ? 'error' : 'info'} title={failed ? '统一身份登录失败' : '登录摇光工作区'}
+    extra={<Button type="primary" loading={pending} onClick={() => void start()}>使用统一身份登录</Button>} />
+}
+
+const router = createBrowserRouter([
+  {path: LOGIN_CALLBACK, caseSensitive: true, element: <OAuthCallback />},
+  {path: POPUP_CALLBACK, caseSensitive: true, element: <OAuthCallback popup />},
+  {path: STANDALONE_LOGIN, caseSensitive: true, element: <StandaloneLogin />},
+  {element: <WorkspaceAuthBoundary />, children: [
   {path: '/login', element: <LoginPage />},
   {
     path: '/',

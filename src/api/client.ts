@@ -1,3 +1,4 @@
+import {ApiError} from '@stellar-enclosure/stellar-enclosure-web-shared'
 import type {AdminErrorBody} from './types'
 import {createLogicalTrace, type LogicalTrace, traceHeaders} from './trace'
 
@@ -53,7 +54,8 @@ export class GatewayApiError extends Error {
 const decodeError = async (response: Response): Promise<GatewayApiError> => {
   let body: AdminErrorBody
   try {
-    body = (await response.json()) as AdminErrorBody
+    const value: unknown = await response.json()
+    body = typeof value === 'object' && value !== null && !Array.isArray(value) ? value as AdminErrorBody : {}
   } catch {
     body = {}
   }
@@ -73,6 +75,7 @@ export const apiRequest = async <T>(
 ): Promise<T> => {
   const trace = request.trace ?? createLogicalTrace()
   const headers = new Headers(request.headers)
+  headers.delete('X-Admin-Actor-Id')
   headers.set('Accept', 'application/json')
   headers.set('X-Yuheng-Contract-Version', CONTRACT_VERSION)
   Object.entries(traceHeaders(trace)).forEach(([name, value]) => headers.set(name, value))
@@ -89,20 +92,17 @@ export const apiRequest = async <T>(
   let response: Response | undefined
   const transport = createWorkspaceTransport('yaoguang', async (...args) => {
     const value = await globalThis.fetch(...args)
-    response = value.clone()
+    response = value.ok ? value : value.clone()
     return value
   })
   try {
     const value = await transport.request<T>(path, {...request, body, headers})
     if (!response) throw new Error('应用请求未返回响应')
-    if (!response.ok) {
-      throw await decodeError(response)
-    }
     if (response.status === 204) {
       return undefined as T
     }
     const responseContract = response.headers.get('X-Yuheng-Contract-Version')
-    if (responseContract && responseContract !== CONTRACT_VERSION && request.method !== 'GET') {
+    if (responseContract && responseContract !== CONTRACT_VERSION && (request.method ?? 'GET').toUpperCase() !== 'GET') {
       throw new GatewayApiError(
         409,
         'YUHENG_ADMIN_CONTRACT_MISMATCH',
@@ -112,9 +112,10 @@ export const apiRequest = async <T>(
     }
     return value
   } catch (error) {
-    if (response && !response.ok) throw await decodeError(response)
-    if (error instanceof GatewayApiError || error instanceof DOMException) {
-      throw error
+    if (error instanceof GatewayApiError || error instanceof DOMException) throw error
+    if (error instanceof ApiError) {
+      if (response && !response.ok) throw await decodeError(response)
+      throw new GatewayApiError(error.status, error.code, error.message, error.requestId ?? trace?.traceId)
     }
     throw new GatewayApiError(
       0,

@@ -30,16 +30,6 @@ export default defineConfig(async ({mode, command}) => {
       host: '127.0.0.1',
       port: 18145,
       strictPort: true,
-      proxy: {
-        '/apps': {
-          target: process.env.YUHENG_AUTH_PROXY ?? 'http://127.0.0.1:18180',
-          changeOrigin: false,
-        },
-        '/api': {
-          target: process.env.YUHENG_ADMIN_PROXY ?? 'http://127.0.0.1:18180',
-          changeOrigin: true,
-        },
-      },
     },
     build: {
       sourcemap: false,

@@ -1,10 +1,9 @@
-import type {GatewayIdentityResult} from '@stellar-enclosure/stellar-enclosure-web-shared'
+import type {PublicOAuthIdentity} from '@stellar-enclosure/stellar-enclosure-web-shared'
 import {snapshotContext, type PermissionSnapshot} from '@stellar-enclosure/stellar-enclosure-web-shared/permissions'
 import type {WorkspaceResource} from '../auth/workspaceResource'
-export const identityFixture = (resource: WorkspaceResource = 'yaoguang'): GatewayIdentityResult => ({
-  issuer: 'https://identity.example/tenants/1', tenantId: '1', subject: 'user-a', appAlias: 'edge-' + resource,
-  clientId: 'edge-' + resource, authorizationExpiresAt: 2_000_000_000, authenticationExpiresAt: 2_000_000_000,
-  securityVersion: {realm: '1', client: '1', subject: '1'}, ssoLogoutUri: 'https://identity.example/tenants/1/logout',
+export const identityFixture = (resource: WorkspaceResource = 'yaoguang'): PublicOAuthIdentity => ({
+  issuer: 'https://identity.example/tenants/1', tenantId: '1', subject: 'user-a',
+  clientId: resource + '-1', accessExpiresAt: Date.now() + 60_000, resource: 'https://resource.example/' + resource,
 })
 export const snapshotFixture = (resource: WorkspaceResource = 'yaoguang', permissionCodes: string[] = ['yuheng:knowledge:read']): PermissionSnapshot => ({
   issuer: identityFixture(resource).issuer, subject: 'user-a', catalogScope: {catalogScopeId: '1', tenantId: '1',

@@ -1,47 +1,23 @@
-import { createReadStream, readFileSync, statSync } from 'node:fs'
-import { createServer, request as proxyRequest } from 'node:http'
-import { request as secureProxyRequest } from 'node:https'
-import { extname, join, normalize } from 'node:path'
+import {createReadStream, readFileSync, statSync} from 'node:fs'
+import {createServer} from 'node:http'
+import {extname, join, resolve, sep} from 'node:path'
+import {fileURLToPath} from 'node:url'
 
-const port = Number.parseInt(process.env.PORT ?? '8080', 10)
-const apiBase = new URL(
-  process.env.YUHENG_EDGE_BASE_URL ?? process.env.YUHENG_ADMIN_API_BASE_URL ?? 'http://edge:18180',
-)
-const appAliases = [process.env.YUHENG_EDGE_APP_ALIAS ?? 'edge-yuheng', process.env.YAOGUANG_EDGE_APP_ALIAS ?? 'edge-yaoguang']
-if (appAliases.some(alias => !/^[a-z][a-z0-9-]{0,63}$/.test(alias))) throw new Error('Invalid Edge application alias')
-const applicationPaths = appAliases.map(alias => `/apps/${alias}/`)
-const developmentPlaintext =
-  process.env.YUHENG_ADMIN_API_DEVELOPMENT_PLAINTEXT === 'true'
-const tlsFile = (name) => {
-  const path = process.env[name]
-  if (!path) {
-    throw new Error(`${name} is required for Edge mTLS`)
-  }
-  return readFileSync(path)
-}
-if (apiBase.protocol === 'http:' && !developmentPlaintext) {
-  throw new Error(
-    'Edge plaintext requires explicit development configuration',
-  )
-}
-if (!['http:', 'https:'].includes(apiBase.protocol)) {
-  throw new Error('Edge origin must use HTTP or HTTPS')
-}
-const apiTls = apiBase.protocol === 'https:'
-  ? {
-      ca: tlsFile('YUHENG_ADMIN_API_TLS_CA_PATH'),
-      cert: tlsFile('YUHENG_ADMIN_API_TLS_CERTIFICATE_PATH'),
-      key: tlsFile('YUHENG_ADMIN_API_TLS_PRIVATE_KEY_PATH'),
-      rejectUnauthorized: true,
-      servername: apiBase.hostname,
-    }
-  : {}
-const root = '/app/dist'
-const buildEvidence = JSON.parse(readFileSync(join(root, 'permission-build.json'), 'utf8'))
-if (buildEvidence.schemaVersion !== 1 || buildEvidence.producerId !== 'yaoguang-web'
-    || buildEvidence.application?.businessCode !== 'xingyuan' || buildEvidence.application?.applicationCode !== 'yaoguang') {
+const port = Number(process.env.PORT ?? 8080)
+const configuredBase = process.env.APP_BASE_PATH ?? '/'
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PORT')
+if (!configuredBase.startsWith('/') || /[\\?#%]|\/{2,}/.test(configuredBase)
+  || [...configuredBase].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+  || configuredBase.split('/').some(segment => segment === '.' || segment === '..')) throw new Error('Invalid APP_BASE_PATH')
+const base = configuredBase.endsWith('/') ? configuredBase : configuredBase + '/'
+const root = fileURLToPath(new URL('./dist', import.meta.url))
+const index = join(root, 'index.html')
+const evidence = JSON.parse(readFileSync(join(root, 'permission-build.json'), 'utf8'))
+if (evidence.schemaVersion !== 1 || evidence.producerId !== 'yaoguang-web'
+  || evidence.application?.businessCode !== 'xingyuan' || evidence.application?.applicationCode !== 'yaoguang') {
   throw new Error('A verified yaoguang-web permission build is required')
 }
+
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],
@@ -52,64 +28,53 @@ const contentTypes = new Map([
   ['.svg', 'image/svg+xml'],
   ['.woff2', 'font/woff2'],
 ])
-
-const proxy = (incoming, outgoing) => {
-  const request = apiBase.protocol === 'https:'
-    ? secureProxyRequest
-    : proxyRequest
-  const upstream = request(
-    new URL(incoming.url, apiBase),
-    {
-      method: incoming.method,
-      headers: { ...incoming.headers, host: apiBase.host },
-      ...apiTls,
-    },
-    (response) => {
-      outgoing.writeHead(response.statusCode ?? 502, response.headers)
-      response.pipe(outgoing)
-    },
-  )
-  upstream.on('error', () => {
-    if (!outgoing.headersSent) {
-      outgoing.writeHead(502, { 'Content-Type': 'application/json' })
-    }
-    outgoing.end('{"code":"YUHENG_ADMIN_WEB_UPSTREAM_UNAVAILABLE"}')
-  })
-  incoming.pipe(upstream)
+const isFile = path => {
+  try { return statSync(path).isFile() } catch { return false }
 }
 
 const serve = (incoming, outgoing) => {
-  if (incoming.url === '/healthz') {
-    outgoing.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
-    outgoing.end('ok')
+  if (incoming.method !== 'GET' && incoming.method !== 'HEAD') {
+    outgoing.writeHead(405, {Allow: 'GET, HEAD'}).end()
     return
   }
-  if (applicationPaths.some(path => incoming.url?.startsWith(path))) {
-    proxy(incoming, outgoing)
+  let pathname
+  try { pathname = decodeURIComponent(new URL(incoming.url, 'http://local').pathname) }
+  catch {
+    outgoing.writeHead(400).end()
     return
   }
-  const pathname = decodeURIComponent(new URL(incoming.url, 'http://local').pathname)
-  const relative = normalize(pathname).replace(/^(\.\.(\/|\\|$))+/, '')
-  let candidate = join(root, relative)
-  try {
-    if (!statSync(candidate).isFile()) {
-      candidate = join(root, 'index.html')
-    }
-  } catch {
-    candidate = join(root, 'index.html')
+  if (pathname === '/healthz') {
+    outgoing.writeHead(200, {'Content-Type': 'text/plain; charset=utf-8'}).end('ok')
+    return
+  }
+  if (pathname === base.slice(0, -1)) {
+    outgoing.writeHead(308, {Location: base}).end()
+    return
+  }
+  const relative = pathname === '/favicon.png' ? 'favicon.png' : pathname.startsWith(base) ? pathname.slice(base.length) : undefined
+  if (relative === undefined || relative.startsWith('/') || relative.includes('\\') || relative.includes('\0')
+    || /^(api|apps)(\/|$)/.test(relative)) {
+    outgoing.writeHead(404).end()
+    return
+  }
+  const requested = resolve(root, relative)
+  if (requested !== root && !requested.startsWith(root + sep)) {
+    outgoing.writeHead(404).end()
+    return
+  }
+  const applicationRoute = /^(?:auth\/(?:oidc\/(?:callback|popup)|standalone)\/[^/]+|knowledge(?:\/[^/]+(?:\/wiki\/[^/]+)?)?)\/?$/.test(relative)
+  const mayUseIndex = applicationRoute || (!extname(requested) && !relative.startsWith('assets/'))
+  const candidate = isFile(requested) ? requested : mayUseIndex ? index : undefined
+  if (!candidate) {
+    outgoing.writeHead(404).end()
+    return
   }
   outgoing.writeHead(200, {
-    'Cache-Control': candidate.endsWith('index.html')
-      ? 'no-cache'
-      : 'public, max-age=31536000, immutable',
-    'Content-Type': contentTypes.get(extname(candidate))
-      ?? 'application/octet-stream',
+    'Cache-Control': candidate === index ? 'no-cache' : 'public, max-age=31536000, immutable',
+    'Content-Type': contentTypes.get(extname(candidate)) ?? 'application/octet-stream',
   })
-  createReadStream(candidate).pipe(outgoing)
+  if (incoming.method === 'HEAD') outgoing.end()
+  else createReadStream(candidate).on('error', () => outgoing.destroy()).pipe(outgoing)
 }
 
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error('PORT must be an integer between 1 and 65535')
-}
-
-createServer(serve).listen(port, '0.0.0.0')
+createServer(serve).listen(port, process.env.HOST ?? '0.0.0.0')

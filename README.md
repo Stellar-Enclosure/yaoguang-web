@@ -14,7 +14,14 @@ React knowledge-base and Wiki workspace for Stellar Enclosure's Yaoguang platfor
 
 Page entry points are in [src/app/App.tsx](src/app/App.tsx), [knowledge features](src/features/knowledge/) and [Wiki features](src/features/wiki/). [Knowledge](src/api/knowledge.ts) and [Wiki](src/api/wiki.ts) clients retain the existing `/api/v1/yuheng/admin` API prefix while calling [yaoguang-service](https://github.com/Stellar-Enclosure/yaoguang-service).
 
-The workspace uses Edge registration `edge-yaoguang`, `/api/v1/yaoguang/auth/bootstrap` and existing `yuheng:knowledge:*` capabilities. Access is checked both by capability and knowledge-base membership. The browser holds the BFF session rather than OAuth tokens. Yuheng gateway/MCP/LLM administration is owned by [yuheng-web](https://github.com/Stellar-Enclosure/yuheng-web); this repository currently implements the knowledge/Wiki portion of Yaoguang's broader roadmap.
+The workspace uses a dedicated PUBLIC registration with S256 PKCE, a Yaoguang Resource Bearer, and the existing `yuheng:knowledge:*` capabilities. Access is checked by capability and knowledge-base membership. Yuheng gateway/MCP/LLM administration is owned by [yuheng-web](https://github.com/Stellar-Enclosure/yuheng-web); this repository currently implements the knowledge/Wiki portion of Yaoguang's broader roadmap.
+
+
+## HTTPS authorization configuration
+
+Set `VITE_YAOGUANG_OAUTH_CONFIG` at build time. The JSON object contains `webOrigin`, `activeResource` (the approved default Yaoguang registration ID), and `workspaces.yaoguang` (the approved tenant registrations). Each registration binds the `id`, `clientId`, `tenantId`, tenant `issuer`, authorization and token endpoints, `jwksUri`, `resource`, `apiBaseUrl`, `scopes`, `browserBound`, and exact `redirectUri` with an optional `popupRedirectUri`. Resource and API base stay fixed across registrations for one workspace. Optional `workspaces.yuheng` requires its own Resource and same-realm registration for any authorized selection.
+
+Set `VITE_BASE_PATH` to the application prefix. For a non-root build, set `APP_BASE_PATH` to the same prefix in the static container. Serve the exact `/auth/oidc/callback/<id>` and optional `/auth/oidc/popup/<id>` callbacks and `/auth/standalone/<id>` through the SPA fallback under that prefix. Allow the approved browser origin on the issuer and Resource APIs as required by CORS. Set `VITE_PERMISSION_NAMESPACE` and `VITE_PERMISSION_ENVIRONMENT` to the deployed catalog scope. Bearer grants stay in memory. Local logout clears the grants and pending requests. SSO logout also opens the issuer's confirmation page.
 
 ## Build and test
 
@@ -40,7 +47,7 @@ The verifier uses actual pack checksums and official registry addresses in the c
 
 ## Knowledge workspace
 
-Owns `/knowledge`, `/knowledge/:kbId`, and `/knowledge/:kbId/wiki/:pageId`. Authentication stays bound to `edge-yaoguang`; existing `yuheng:knowledge:*` capabilities and API paths remain. Vite development port is 18145; no server starts automatically.
+Owns `/knowledge`, `/knowledge/:kbId`, and `/knowledge/:kbId/wiki/:pageId`. Authentication is scoped to the Yaoguang Resource. Existing `yuheng:knowledge:*` capabilities and API paths remain. Vite development port is 18145; no server starts automatically.
 
 ## Application delivery (no package publication)
 

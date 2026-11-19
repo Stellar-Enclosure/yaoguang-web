@@ -16,7 +16,7 @@ Yaoguang Web 是独立的 React 知识工作区，由 `yaoguang-service` 提供�
 
 ## 认证与 API 边界
 
-控制台通过共享 SDK 的 `createGatewayAuthClient` 使用 Edge BFF 会话。默认 OIDC registration 是 `edge-yaoguang`，由 `VITE_YAOGUANG_OAUTH_REGISTRATION_ID` 覆盖。Edge 在服务端保管 OAuth Token，浏览器使用 HttpOnly Cookie 和受 CSRF 保护的退出接口，不保存 AT/RT。
+摇光通过共享 SDK 使用 PUBLIC OAuth 和 S256 PKCE。浏览器在内存中持有摇光 Resource 的短时 Bearer，直接请求后端。可选玉衡通道使用单独注册与受众。配置字段和精确回调见 [HTTPS 授权配置](README.md#https-authorization-configuration)。容器部署于子路径时，`APP_BASE_PATH` 与构建时的 `VITE_BASE_PATH` 一致。
 
 授权上下文来自 `GET /api/v1/yaoguang/auth/bootstrap`。页面要求 `yuheng:knowledge:read`；写入、发布、下线等操作继续受服务端 capability 与知识库成员权限约束。业务 API 仍使用 `/api/v1/yuheng/admin` 前缀与 `yuheng:knowledge:*` 权限名，这是拆仓后保留的兼容合同；不表示浏览器应调用 Yuheng Admin。
 
@@ -31,7 +31,7 @@ npm run lint
 npm run build
 ```
 
-操作者显式执行 `npm run dev` 时，Vite 绑定 `127.0.0.1:18145`，启用 `strictPort`。`/oauth2`、`/bff`、`/login/oauth2` 代理由 `YUHENG_AUTH_PROXY` 指定，`/api` 由 `YUHENG_ADMIN_PROXY` 指定；默认均为 `http://127.0.0.1:18180`，应接入能正确路由到 Yaoguang 的 Edge 入口。
+执行 `npm run dev` 时，Vite 绑定 `127.0.0.1:18145` 并启用 `strictPort`。授权与管理 API 使用构建时配置的 HTTPS origin。
 
 `npm run e2e` 是单独的浏览器验证入口，可能启动预览/开发服务；普通构建和单元测试不执行它。Mock API 或隔离组件测试不证明真实 OAuth、文档索引、模型调用或数据库可用。
 
@@ -45,7 +45,7 @@ npm run build
 |---|---|
 | `VITE_YUHENG_ORIGIN` | 构建时 API/BFF Origin，留空使用当前 Origin |
 | `VITE_YAOGUANG_OAUTH_REGISTRATION_ID` | 知识工作区登录 registration，默认 `edge-yaoguang` |
-| `YUHENG_AUTH_PROXY`、`YUHENG_ADMIN_PROXY` | Vite 开发代理的认证与 API 上游 |
+执行 `npm run dev` 时，Vite 绑定 `127.0.0.1:18145` 并启用 `strictPort`。授权与管理 API 使用构建时配置的 HTTPS origin。
 | `YUHENG_ADMIN_API_BASE_URL` | `static-server.mjs` 的 `/api` 上游；源码默认 `http://yuheng-admin:18080`，Yaoguang 部署必须显式配置到合适的 API 入口 |
 | `YUHENG_ADMIN_API_DEVELOPMENT_PLAINTEXT` | 使用 HTTP 上游时必须显式为 `true` |
 | `YUHENG_ADMIN_API_TLS_CA_PATH`、`YUHENG_ADMIN_API_TLS_CERTIFICATE_PATH`、`YUHENG_ADMIN_API_TLS_PRIVATE_KEY_PATH` | HTTPS 上游的 CA 与客户端证书/私钥文件 |

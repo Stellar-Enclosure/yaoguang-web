@@ -3,6 +3,7 @@ import {createRoot, type Root} from 'react-dom/client'
 import 'antd/dist/reset.css'
 import {AdminThemeProvider, I18nProvider, initI18n, injectTokens} from '@stellar-enclosure/stellar-enclosure-web-shared'
 import {App} from './app/App'
+import {workspaceOAuth} from './auth/authTransport'
 
 injectTokens()
 
@@ -39,6 +40,7 @@ const mount = (): void => {
 const unmount = (): void => {
     root?.unmount()
     root = undefined
+    workspaceOAuth.logout()
 }
 
 if (runtimeWindow.__POWERED_BY_WUJIE__) {

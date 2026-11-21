@@ -1,5 +1,6 @@
 import {useWritableFields} from '../../permissions/FieldCatalog'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {useEmbeddedWorkbench} from '@stellar-enclosure/stellar-enclosure-web-shared'
 import {
   Alert,
   Button,
@@ -14,7 +15,8 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import {useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
+import {useNavigate} from 'react-router-dom'
 import {
   knowledgeApi,
   knowledgeSearchModeValues,
@@ -26,30 +28,62 @@ import {
 import {GatewayApiError} from '../../api/client'
 import {QueryFailure} from '../../components/QueryState'
 
-type AskForm = KnowledgeAnswerCommand
+export type AskForm = KnowledgeAnswerCommand
+
+export interface KnowledgeAnswerPanelProps {
+  readonly kbId: string
+  readonly sessionKey?: string
+  readonly submitOnEnter?: boolean
+  readonly cardTitle?: string
+  readonly onAnswered?: (command: AskForm, answer: KnowledgeAnswer) => void
+  readonly onForbidden?: () => void
+  readonly onOpenWikiCitation?: (citation: KnowledgeCitation) => void
+}
 
 const isForbidden = (error: unknown): boolean =>
   error instanceof GatewayApiError && error.status === 403
 
-// 正文一律按纯文本渲染（不用 dangerouslySetInnerHTML）；引用可追溯到冻结版本与 hash。
-export const KnowledgeAnswerPanel = ({ kbId }: { kbId: string }) => {
+const KnowledgeAnswerPanelInner = ({
+  kbId,
+  submitOnEnter = false,
+  cardTitle = '基于授权资料与 Wiki 提问',
+  onAnswered,
+  onForbidden,
+  onOpenWikiCitation,
+}: KnowledgeAnswerPanelProps) => {
+  const {embedded, requestNavigation} = useEmbeddedWorkbench()
+  const navigate = useNavigate()
   const answerFields = useWritableFields('KnowledgeAnswerCommandDTO')
   const queryClient = useQueryClient()
   const [form] = Form.useForm<AskForm>()
   const [result, setResult] = useState<KnowledgeAnswer>()
   const [selected, setSelected] = useState<KnowledgeCitation>()
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   const ask = useMutation({
     mutationFn: (command: AskForm) => knowledgeApi.createAnswer(kbId, command),
     retry: false,
-    onSuccess: (answer) => {
+    onSuccess: (answer, command) => {
+      if (!mountedRef.current) return
       setSelected(undefined)
       setResult(answer)
+      onAnswered?.(command, answer)
     },
     onError: (error) => {
       if (isForbidden(error)) {
-        setResult(undefined)
-        setSelected(undefined)
+        if (mountedRef.current) {
+          setResult(undefined)
+          setSelected(undefined)
+        }
         queryClient.removeQueries({queryKey: ['knowledge', kbId]})
+        onForbidden?.()
       }
     },
   })
@@ -68,9 +102,23 @@ export const KnowledgeAnswerPanel = ({ kbId }: { kbId: string }) => {
     revision.data && selected && revision.data.hash !== selected.sourceHash,
   )
 
+  const openWiki = (citation: KnowledgeCitation) => {
+    if (!citation.pageId) return
+    if (onOpenWikiCitation) {
+      onOpenWikiCitation(citation)
+      return
+    }
+    const targetPath = `/knowledge/${kbId}/wiki/${citation.pageId}`
+    if (embedded) {
+      requestNavigation('push', {path: targetPath, search: ''})
+      return
+    }
+    navigate(targetPath)
+  }
+
   return (
     <Space direction="vertical" size="middle" style={{width: '100%'}}>
-      <Card title="基于授权资料与 Wiki 提问">
+      <Card title={cardTitle}>
         <Form<AskForm>
           disabled={!answerFields}
           form={form}
@@ -84,7 +132,20 @@ export const KnowledgeAnswerPanel = ({ kbId }: { kbId: string }) => {
             extra="问题只作为用户输入，不作为系统指令。"
             rules={[{required: true, message: '请输入问题'}, {max: 8000}]}
           >
-            <Input.TextArea rows={3} maxLength={8000} aria-label="问题" />
+            <Input.TextArea
+              rows={3}
+              maxLength={8000}
+              aria-label="问题"
+              onKeyDown={(event) => {
+                if (!submitOnEnter) return
+                const native = event.nativeEvent as KeyboardEvent
+                if (native.isComposing || event.keyCode === 229) return
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  form.submit()
+                }
+              }}
+            />
           </Form.Item>
           <Space wrap align="start">
             <Form.Item name="sourceMode" label="证据范围">
@@ -146,13 +207,24 @@ export const KnowledgeAnswerPanel = ({ kbId }: { kbId: string }) => {
                   <Typography.Paragraph style={{whiteSpace: 'pre-wrap'}}>
                     {item.excerpt}
                   </Typography.Paragraph>
-                  <Button
-                    size="small"
-                    onClick={() => setSelected(item)}
-                  >
-                    查看原文版本
-                  </Button>
-                  {item.pageId && <Tag>{`Wiki ${item.pageId}`}</Tag>}
+                  <Space wrap>
+                    <Button
+                      size="small"
+                      onClick={() => setSelected(item)}
+                    >
+                      查看原文版本
+                    </Button>
+                    {item.pageId && (
+                      <Button
+                        size="small"
+                        type="link"
+                        onClick={() => openWiki(item)}
+                      >
+                        {`打开 Wiki ${item.pageId}`}
+                      </Button>
+                    )}
+                    {item.pageId && <Tag>{`Wiki ${item.pageId}`}</Tag>}
+                  </Space>
                 </Space>
               </List.Item>
             )}
@@ -181,3 +253,8 @@ export const KnowledgeAnswerPanel = ({ kbId }: { kbId: string }) => {
     </Space>
   )
 }
+
+// 正文一律按纯文本渲染（不用 dangerouslySetInnerHTML）；引用可追溯到冻结版本与 hash。
+export const KnowledgeAnswerPanel = (props: KnowledgeAnswerPanelProps) => (
+  <KnowledgeAnswerPanelInner key={`${props.kbId}:${props.sessionKey ?? 'default'}`} {...props} />
+)

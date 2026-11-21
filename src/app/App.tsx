@@ -60,6 +60,9 @@ const KnowledgeBasePage = lazy(() =>
 const WikiPage = lazy(() =>
   import('../features/wiki/WikiPage').then((module) => ({default: module.WikiPage})),
 )
+const KnowledgeAssistantPage = lazy(() =>
+  import('../features/knowledge/KnowledgeAssistantPage').then((module) => ({default: module.KnowledgeAssistantPage})),
+)
 const guarded = (capability: Capability, node: ReactNode) => (
   <RequireCapability capability={capability}>{node}</RequireCapability>
 )
@@ -118,6 +121,7 @@ const router = createBrowserRouter([
       {path: 'knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeBasesPage />)},
       {path: 'knowledge/:kbId', element: guarded('yaoguang.page.knowledge.kbId', <KnowledgeBasePage />)},
       {path: 'knowledge/:kbId/wiki/:pageId', element: guarded('yaoguang.page.knowledge.kbId.wiki.pageId', <WikiPage />)},
+      {path: 'assistant/knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeAssistantPage />)},
       {path: '*', element: <Result status="404" title="404" subTitle="页面不存在" />},
     ],
   },
@@ -206,6 +210,7 @@ const YaoguangWorkbenchRouter = ({workbenchHost}: {readonly workbenchHost: Workb
             {path: 'knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeBasesPage />)},
             {path: 'knowledge/:kbId', element: guarded('yaoguang.page.knowledge.kbId', <KnowledgeBasePage />)},
             {path: 'knowledge/:kbId/wiki/:pageId', element: guarded('yaoguang.page.knowledge.kbId.wiki.pageId', <WikiPage />)},
+            {path: 'assistant/knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeAssistantPage />)},
             {path: '*', element: <Result status="404" title="404" subTitle="页面不存在" />},
           ],
         },

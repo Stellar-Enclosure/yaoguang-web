@@ -97,6 +97,19 @@ export const yaoguangWorkbenchRoutes: readonly YaoguangWorkbenchRouteDescriptor[
   }
 })
 
+export const yaoguangAssistantRoute: YaoguangWorkbenchRouteDescriptor = {
+  id: 'yaoguang.assistant.knowledge',
+  resourceKey: 'yaoguang.page.knowledge',
+  pattern: '/assistant/knowledge',
+  title: '知识问答助手',
+  group: 'assistant',
+  groupLabel: '知识问答助手',
+  navVisible: false,
+  identityParams: [],
+  queryKeys: ['kbId'],
+  requirement: yaoguangWorkbenchRoutes[0]!.requirement,
+}
+
 export const canAccessYaoguangRoute = (
   checker: YaoguangAuthorizationSource,
   route: YaoguangWorkbenchRouteDescriptor,
@@ -122,7 +135,7 @@ export const buildYaoguangCatalogPages = (checker: YaoguangAuthorizationSource):
 
 export const matchYaoguangRoute = (path: string): YaoguangRouteMatch | null => {
   const normalized = path.split('?')[0] ?? path
-  for (const route of yaoguangWorkbenchRoutes) {
+  for (const route of [...yaoguangWorkbenchRoutes, yaoguangAssistantRoute]) {
     const routeSegments = route.pattern.split('/').filter(Boolean)
     const pathSegments = normalized.split('/').filter(Boolean)
     if (routeSegments.length !== pathSegments.length) continue

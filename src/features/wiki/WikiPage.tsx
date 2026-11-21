@@ -1,5 +1,6 @@
 import {useWritableFields} from '../../permissions/FieldCatalog'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
+import {useEmbeddedWorkbench, useWorkbenchLeaveGuard} from '@stellar-enclosure/stellar-enclosure-web-shared'
 import {
   Alert,
   Badge,
@@ -44,9 +45,9 @@ const fromPage = (page: WikiPageView): DraftState => ({
 })
 
 // 阅读/编辑 Wiki：DIRECT 策略直接发布，不显示任何“审核通过/拒绝”动作（原业务Spec §12.2）。
-export const WikiPage = () => {
-  const {kbId = '', pageId = ''} = useParams()
-  const [searchParams, setSearchParams] = useSearchParams()
+const WikiPageInner = ({kbId, pageId}: {readonly kbId: string; readonly pageId: string}) => {
+  const {activeTabKey} = useEmbeddedWorkbench()
+  const [searchParams] = useSearchParams()
   const revisionId = searchParams.get('revision') ?? undefined
   const queryClient = useQueryClient()
   const draftFields = useWritableFields('WikiDraftWriteCommandDTO', 'WikiSourceWriteDTO')
@@ -123,6 +124,11 @@ export const WikiPage = () => {
     onError: (error) => {
       if (isForbidden(error)) clearSensitiveCache()
     },
+  })
+
+  useWorkbenchLeaveGuard(activeTabKey ?? `yaoguang:wiki:${kbId}:${pageId}`, {
+    dirty: draft !== undefined,
+    pendingMutation: saveDraft.isPending || publish.isPending || unpublish.isPending,
   })
 
   if (page.isLoading) return <LoadingBlock />
@@ -311,4 +317,9 @@ export const WikiPage = () => {
       </Space>
     </Space>
   )
+}
+
+export const WikiPage = () => {
+  const {kbId = '', pageId = ''} = useParams()
+  return <WikiPageInner key={`${kbId}:${pageId}`} kbId={kbId} pageId={pageId} />
 }

@@ -1,5 +1,6 @@
 vi.mock('../../permissions/FieldCatalog', () => ({useWritableFields: () => true, useUploadFieldsWritable: () => true}))
 import {authorizationFixture} from '../../test/permissionFixtures'
+import {EmbeddedWorkbench, type WorkbenchHost, type WorkbenchPort} from '@stellar-enclosure/stellar-enclosure-web-shared'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react'
 import {MemoryRouter, Route, Routes} from 'react-router-dom'
@@ -7,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {GatewayApiError} from '../../api/client'
 import type {KnowledgeBase, KnowledgeDocument, KnowledgeJob} from '../../api/knowledge'
 import {CapabilityProvider} from '../../app/capabilities'
+import {WikiPage} from '../wiki/WikiPage'
 import {KnowledgeBasePage} from './KnowledgeBasePage'
 
 // 原业务Spec §12.1「KB 工作区」+ §12.2 + §12.3 的 UI state 表 + TEST-010：
@@ -620,5 +622,76 @@ describe('KnowledgeBasePage wiki generation (TEST-010)', () => {
     expect(screen.getByText('NOT_REQUIRED')).toBeInTheDocument()
     expect(screen.getByText('DIRECT')).toBeInTheDocument()
     expect(screen.getByText('来源已变化')).toBeInTheDocument()
+  })
+
+  it('isolates state across kbId swaps and registers leave guard on WikiPage draft edits', async () => {
+    grantEmployee('yuheng:knowledge:write')
+    knowledge.knowledgeBase.mockImplementation((id: string) => Promise.resolve(
+      kbFixture({id, name: id === '71001' ? '研发知识库' : '财务知识库'}),
+    ))
+    wiki.page.mockImplementation((kbId: string, pageId: string) => Promise.resolve({
+      id: pageId,
+      kbId,
+      slug: `slug-${pageId}`,
+      title: `标题-${pageId}`,
+      markdown: `正文-${pageId}`,
+      tags: [],
+      links: [],
+      sources: [],
+      revision: 1,
+      publicationStatus: 'DRAFT',
+      reviewStatus: 'NOT_REQUIRED',
+      publicationPolicySnapshot: 'DIRECT',
+      draftRevisionId: 'rev-1',
+      publishedRevisionId: null,
+      stale: false,
+    }))
+    wiki.pages.mockResolvedValue({items: [], page: 1, size: 20, total: 0})
+    wiki.graph.mockResolvedValue({nodes: [], edges: []})
+
+    const capturedPorts: WorkbenchPort[] = []
+    const host: WorkbenchHost = {
+      attach: (next) => {
+        capturedPorts.push(next)
+        return {ok: true}
+      },
+      reportCatalog: () => ({ok: true}),
+      requestNavigation: () => ({ok: true}),
+    }
+    const queryClient = new QueryClient({defaultOptions: {queries: {retry: false}}})
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <CapabilityProvider>
+          <MemoryRouter initialEntries={['/knowledge/71001/wiki/page-1']}>
+            <EmbeddedWorkbench host={host} status="ready" pages={[]} onPresent={async () => ({ok: true as const})}>
+              <Routes>
+                <Route path="/knowledge/:kbId" element={<KnowledgeBasePage />} />
+                <Route path="/knowledge/:kbId/wiki/:pageId" element={<WikiPage />} />
+              </Routes>
+            </EmbeddedWorkbench>
+          </MemoryRouter>
+        </CapabilityProvider>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => expect(capturedPorts).toHaveLength(1))
+    const tabKey = '["yaoguang","yaoguang.page.knowledge.kbId.wiki.pageId","71001","page-1"]'
+    await capturedPorts[0]!.present({
+      mode: 'show',
+      navigationId: 1,
+      tabKey,
+      target: {path: '/knowledge/71001/wiki/page-1', search: ''},
+      signal: new AbortController().signal,
+    })
+
+    expect(await screen.findByText('标题-page-1')).toBeInTheDocument()
+    expect(capturedPorts[0]!.checkLeave({reason: 'close', tabKey})).toEqual(
+      expect.objectContaining({ok: true, dirty: false}),
+    )
+    fireEvent.click(screen.getByRole('button', {name: '编辑草稿'}))
+    expect(capturedPorts[0]!.checkLeave({reason: 'close', tabKey})).toEqual(
+      expect.objectContaining({ok: true, dirty: true}),
+    )
+    view.unmount()
   })
 })

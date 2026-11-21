@@ -39,10 +39,18 @@ const navigation: readonly GatewayNavItem[] = [
   },
 ]
 
-export const AdminLayout = () => {
+export const AdminLayout = ({ workbenchEmbedded = false }: { readonly workbenchEmbedded?: boolean } = {}) => {
   const navigate = useNavigate()
   const auth = useAuth()
   const permission = usePermission(auth.authorization?.snapshot ?? null, auth.authorization?.binding ?? null)
+
+  if (workbenchEmbedded) {
+    return (
+      <div className="yaoguang-workbench-outlet" style={{ width: '100%', minWidth: 0 }}>
+        <Outlet />
+      </div>
+    )
+  }
 
   const embedded = (window as WujieRuntimeWindow).$wujie?.props?.embedded === true
   const items: EnterpriseNavigationItem[] = filterNavigation(navigation, Object.fromEntries(resources.map(resource => [resource.key, permission.allows('requirement' in resource ? resource.requirement : {access: resource.access})])))

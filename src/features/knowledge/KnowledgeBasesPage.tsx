@@ -1,6 +1,7 @@
 import {useWritableFields} from '../../permissions/FieldCatalog'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {Alert, Button, Card, Form, Input, Modal, Select, Space, Table, Typography} from 'antd'
+import {WorkspaceList, useEmbeddedWorkbench} from '@stellar-enclosure/stellar-enclosure-web-shared'
+import {Alert, Button, Form, Input, Modal, Select, Space, Table, Typography} from 'antd'
 import {useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {
@@ -11,12 +12,12 @@ import {
 } from '../../api/knowledge'
 import {GatewayApiError} from '../../api/client'
 import {useCapability} from '../../app/capabilities'
-import {EmptyBlock, LoadingBlock, QueryFailure} from '../../components/QueryState'
 
 type CreateForm = KnowledgeBaseCommand
 
 // 员工只能列出自己作为成员的 KB（服务端过滤）；命令体不含 actorId/tenantId。
 export const KnowledgeBasesPage = () => {
+  const { embedded } = useEmbeddedWorkbench()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createFields = useWritableFields('KnowledgeBaseCreateCommandDTO')
@@ -39,20 +40,15 @@ export const KnowledgeBasesPage = () => {
     },
   })
 
-  if (bases.isLoading) return <LoadingBlock />
-  if (bases.isError) {
-    // 无权限与“有权限但无 KB”必须可区分：403 由错误分支给出，空列表走空态。
-    return <QueryFailure error={bases.error} retry={() => void bases.refetch()} />
-  }
-
   const items = bases.data?.items ?? []
   const conflict = create.error instanceof GatewayApiError && create.error.status === 409
 
   return (
-    <Card
-      title="企业知识"
-      extra={(
-        <Space>
+    <>
+      {!embedded && <Typography.Title level={4} style={{marginTop: 0}}>企业知识</Typography.Title>}
+      <WorkspaceList
+        ariaLabel="企业知识"
+        filters={(
           <Input.Search
             allowClear
             placeholder="按名称检索"
@@ -60,41 +56,49 @@ export const KnowledgeBasesPage = () => {
             onChange={(event) => setName(event.target.value)}
             onSearch={(value) => setName(value)}
           />
-          <Button
-            type="primary"
-            disabled={!canCreate}
-            title={canCreate ? undefined : '当前账号缺少 yuheng:knowledge:write 能力'}
-            onClick={() => setOpen(true)}
-          >
-            新建知识库
-          </Button>
-        </Space>
-      )}
-    >
-      {items.length === 0 ? (
-        <EmptyBlock description="你还没有被加入任何知识库，请联系知识库所有者把你加为成员" />
-      ) : (
-        <Table<KnowledgeBase>
-          rowKey="id"
-          dataSource={items}
-          pagination={{total: bases.data?.total ?? 0, pageSize: 20}}
-          columns={[
-            {
-              title: '名称',
-              dataIndex: 'name',
-              render: (_, record) => (
-                <Typography.Link onClick={() => navigate(`/knowledge/${record.id}`)}>
-                  {record.name}
-                </Typography.Link>
-              ),
-            },
-            {title: '我的角色', dataIndex: 'myRole'},
-            {title: '出域策略', dataIndex: 'egressPolicy'},
-            {title: '对话模型', dataIndex: 'chatModel'},
-            {title: '嵌入模型', dataIndex: 'embeddingModel'},
-          ]}
-        />
-      )}
+        )}
+        toolbar={(
+          <Space>
+            <Button
+              type="primary"
+              disabled={!canCreate}
+              title={canCreate ? undefined : '当前账号缺少 yuheng:knowledge:write 能力'}
+              onClick={() => setOpen(true)}
+            >
+              新建知识库
+            </Button>
+          </Space>
+        )}
+        pageState={{
+          loading: bases.isLoading,
+          error: bases.isError ? bases.error : null,
+          empty: !bases.isLoading && !bases.isError && items.length === 0,
+          emptyDescription: '你还没有被加入任何知识库，请联系知识库所有者把你加为成员',
+          onRetry: () => void bases.refetch(),
+        }}
+        table={(
+          <Table<KnowledgeBase>
+            rowKey="id"
+            dataSource={items}
+            pagination={false}
+            columns={[
+              {
+                title: '名称',
+                dataIndex: 'name',
+                render: (_, record) => (
+                  <Typography.Link onClick={() => navigate(`/knowledge/${record.id}`)}>
+                    {record.name}
+                  </Typography.Link>
+                ),
+              },
+              {title: '我的角色', dataIndex: 'myRole'},
+              {title: '出域策略', dataIndex: 'egressPolicy'},
+              {title: '对话模型', dataIndex: 'chatModel'},
+              {title: '嵌入模型', dataIndex: 'embeddingModel'},
+            ]}
+          />
+        )}
+      />
       <Modal
         open={open}
         title="新建知识库"
@@ -153,6 +157,6 @@ export const KnowledgeBasesPage = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+    </>
   )
 }

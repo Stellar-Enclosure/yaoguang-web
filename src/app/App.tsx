@@ -1,16 +1,47 @@
 import {FieldCatalogProvider} from '../permissions/FieldCatalog'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
+import {
+  bridgeFail,
+  bridgeOk,
+  EmbeddedWorkbench,
+  type WorkbenchHost,
+} from '@stellar-enclosure/stellar-enclosure-web-shared'
+import {allowsSnapshotRequirement} from '@stellar-enclosure/stellar-enclosure-web-shared/permissions'
 import {Button, ConfigProvider, Result} from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import {lazy, Suspense, useEffect, useState, type ReactNode} from 'react'
-import {createBrowserRouter, Link, Navigate, Outlet, RouterProvider, useNavigate, useParams} from 'react-router-dom'
+import {lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode} from 'react'
+import {
+  createBrowserRouter,
+  createMemoryRouter,
+  Link,
+  Navigate,
+  Outlet,
+  RouterProvider,
+  useNavigate,
+  useParams,
+} from 'react-router-dom'
 import {CapabilityProvider, type Capability} from './capabilities'
-import {AuthProvider} from '../auth/AuthContext'
+import {AuthProvider, useAuth} from '../auth/AuthContext'
 import {LoginPage} from '../auth/LoginPage'
 import {LOGIN_CALLBACK, POPUP_CALLBACK, STANDALONE_LOGIN, workspaceOAuth} from '../auth/authTransport'
 import {RequireAuth, RequireCapability} from '../auth/RouteGuards'
 import {LoadingBlock} from '../components/QueryState'
 import {AdminLayout} from '../layouts/AdminLayout'
+import {resources} from '../permissions/resources'
+import {
+  buildYaoguangCatalogPages,
+  canAccessYaoguangRoute,
+  matchYaoguangRoute,
+} from '../workbench/routes'
+
+interface WujieWorkbenchWindow extends Window {
+  $wujie?: {
+    props?: {
+      embedded?: boolean
+      workbenchHost?: WorkbenchHost
+    }
+  }
+}
 
 const configuredBase: string = import.meta.env.VITE_BASE_PATH ?? '/'
 if (!configuredBase.startsWith('/') || configuredBase.startsWith('//')
@@ -106,21 +137,106 @@ const queryClient = new QueryClient({
   },
 })
 
-export const App = () => (
-  <ConfigProvider
-    locale={zhCN}
-    theme={{
-      token: {
-        colorPrimary: '#3157d5',
-        borderRadius: 8,
-        colorBgLayout: '#f4f6fa',
-      },
-    }}
-  >
-    <QueryClientProvider client={queryClient}>
-      <Suspense fallback={<LoadingBlock />}>
-        <RouterProvider router={router} />
-      </Suspense>
-    </QueryClientProvider>
-  </ConfigProvider>
-)
+const appConsoleRequirement =
+  resources.find((entry) => entry.key === 'yaoguang.app.console')?.requirement
+  ?? {mode: 'ALL' as const, codes: ['yuheng:knowledge:read']}
+
+const YaoguangWorkbenchBridge = ({workbenchHost}: {readonly workbenchHost: WorkbenchHost}) => {
+  const auth = useAuth()
+  const navigate = useNavigate()
+
+  const pages = useMemo(() => {
+    if (!auth.authorization) return []
+    const {snapshot, binding} = auth.authorization
+    return buildYaoguangCatalogPages({
+      allows: (requirement: unknown) => allowsSnapshotRequirement(snapshot, binding, requirement),
+    })
+  }, [auth.authorization])
+
+  const status = useMemo(() => {
+    if (auth.loading) return 'authorizing' as const
+    if (auth.error) return 'failed' as const
+    if (!auth.authorization) return 'denied' as const
+    const {snapshot, binding} = auth.authorization
+    return allowsSnapshotRequirement(snapshot, binding, appConsoleRequirement)
+      ? ('ready' as const)
+      : ('denied' as const)
+  }, [auth.authorization, auth.error, auth.loading])
+
+  const handlePresent = useCallback(async (presentation: Parameters<
+    NonNullable<Parameters<typeof EmbeddedWorkbench>[0]['onPresent']>
+  >[0]) => {
+    if (presentation.mode !== 'show') {
+      return bridgeOk()
+    }
+    const matched = matchYaoguangRoute(presentation.target.path)
+    if (!matched) {
+      return bridgeFail('NOT_FOUND')
+    }
+    if (!auth.authorization || !canAccessYaoguangRoute(auth.authorization, matched.route)) {
+      return bridgeFail('DENIED')
+    }
+    await navigate(`${presentation.target.path}${presentation.target.search ?? ''}`, {replace: true})
+    return bridgeOk()
+  }, [auth.authorization, navigate])
+
+  return (
+    <EmbeddedWorkbench
+      host={workbenchHost}
+      status={status}
+      pages={pages}
+      onPresent={handlePresent}
+    >
+      <AdminLayout workbenchEmbedded />
+    </EmbeddedWorkbench>
+  )
+}
+
+const YaoguangWorkbenchRouter = ({workbenchHost}: {readonly workbenchHost: WorkbenchHost}) => {
+  const [workbenchRouter] = useState(() => createMemoryRouter([
+    {
+      element: <WorkspaceAuthBoundary />,
+      children: [
+        {
+          path: '/',
+          element: <YaoguangWorkbenchBridge workbenchHost={workbenchHost} />,
+          errorElement: <Result status="error" title="页面加载失败" subTitle="请返回上一页或刷新。" />,
+          children: [
+            {path: '__workbench/idle', element: null},
+            {path: 'knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeBasesPage />)},
+            {path: 'knowledge/:kbId', element: guarded('yaoguang.page.knowledge.kbId', <KnowledgeBasePage />)},
+            {path: 'knowledge/:kbId/wiki/:pageId', element: guarded('yaoguang.page.knowledge.kbId.wiki.pageId', <WikiPage />)},
+            {path: '*', element: <Result status="404" title="404" subTitle="页面不存在" />},
+          ],
+        },
+      ],
+    },
+  ], {initialEntries: ['/__workbench/idle']}))
+
+  return <RouterProvider router={workbenchRouter} />
+}
+
+export const App = ({workbenchHost}: {readonly workbenchHost?: WorkbenchHost} = {}) => {
+  const resolvedWorkbenchHost = workbenchHost ?? (window as WujieWorkbenchWindow).$wujie?.props?.workbenchHost
+
+  return (
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        token: {
+          colorPrimary: '#3157d5',
+          borderRadius: 8,
+          colorBgLayout: '#f4f6fa',
+        },
+      }}
+    >
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<LoadingBlock />}>
+          {resolvedWorkbenchHost
+            ? <YaoguangWorkbenchRouter workbenchHost={resolvedWorkbenchHost} />
+            : <RouterProvider router={router} />}
+        </Suspense>
+      </QueryClientProvider>
+    </ConfigProvider>
+  )
+}

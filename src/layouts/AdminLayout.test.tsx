@@ -56,4 +56,20 @@ describe('Yaoguang application ownership', () => {
     renderLayout()
     expect(screen.queryByText('知识库')).not.toBeInTheDocument()
   })
+  it('omits Yaoguang layout navigation and chrome when mounted for workbench-1', () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/knowledge']}>
+          <Routes>
+            <Route path="/" element={<AdminLayout workbenchEmbedded />}>
+              <Route path="knowledge" element={<div>Knowledge outlet</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(screen.getByText('Knowledge outlet')).toBeInTheDocument()
+    expect(screen.queryByText('Yaoguang Admin')).not.toBeInTheDocument()
+    expect(screen.queryByText('知识库')).not.toBeInTheDocument()
+  })
 })

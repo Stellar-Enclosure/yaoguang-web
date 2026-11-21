@@ -1,4 +1,5 @@
 import {useWritableFields, useUploadFieldsWritable} from '../../permissions/FieldCatalog'
+import {useEmbeddedWorkbench} from '@stellar-enclosure/stellar-enclosure-web-shared'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {
   Alert,
@@ -45,8 +46,8 @@ type SettingsForm = {
 }
 
 // 员工知识工作区：与旧管理 guard 独立，权限来自服务端返回的 myRole + 知识能力。
-export const KnowledgeBasePage = () => {
-  const {kbId = ''} = useParams()
+const KnowledgeBaseInner = ({kbId}: {readonly kbId: string}) => {
+  const {embedded} = useEmbeddedWorkbench()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const settingsFields = useWritableFields('KnowledgeBaseCommandDTO')
@@ -215,16 +216,17 @@ export const KnowledgeBasePage = () => {
   const tab = searchParams.get('tab') ?? 'documents'
 
   return (
-    <Card
-      title={kb.data.name}
-      extra={(
-        <Space wrap>
-          <Tag>{`我的角色：${kb.data.myRole}`}</Tag>
-          <Tag>{`出域策略：${kb.data.egressPolicy}`}</Tag>
-          <Tag>{`嵌入空间：${kb.data.embeddingSpaceId ?? '—'} · ${kb.data.dimensions ?? '—'} 维`}</Tag>
-        </Space>
-      )}
-    >
+    <div style={{width: '100%', minWidth: 0}}>
+      <Card
+        title={embedded ? undefined : kb.data.name}
+        extra={(
+          <Space wrap>
+            <Tag>{`我的角色：${kb.data.myRole}`}</Tag>
+            <Tag>{`出域策略：${kb.data.egressPolicy}`}</Tag>
+            <Tag>{`嵌入空间：${kb.data.embeddingSpaceId ?? '—'} · ${kb.data.dimensions ?? '—'} 维`}</Tag>
+          </Space>
+        )}
+      >
       <Tabs
         activeKey={tab}
         onChange={(next) => setSearchParams({tab: next})}
@@ -546,7 +548,8 @@ export const KnowledgeBasePage = () => {
           </Form.Item>
         </Form>
       </Drawer>
-    </Card>
+      </Card>
+    </div>
   )
 }
 
@@ -609,4 +612,9 @@ const MembersEditor = ({
       </Form>
     </Card>
   )
+}
+
+export const KnowledgeBasePage = () => {
+  const {kbId = ''} = useParams()
+  return <KnowledgeBaseInner key={kbId} kbId={kbId} />
 }

@@ -191,7 +191,7 @@ const YaoguangWorkbenchBridge = ({workbenchHost}: {readonly workbenchHost: Workb
       pages={pages}
       onPresent={handlePresent}
     >
-      <AdminLayout workbenchEmbedded />
+      <Outlet />
     </EmbeddedWorkbench>
   )
 }
@@ -202,16 +202,22 @@ const YaoguangWorkbenchRouter = ({workbenchHost}: {readonly workbenchHost: Workb
       element: <WorkspaceAuthBoundary />,
       children: [
         {
-          path: '/',
           element: <YaoguangWorkbenchBridge workbenchHost={workbenchHost} />,
           errorElement: <Result status="error" title="页面加载失败" subTitle="请返回上一页或刷新。" />,
           children: [
-            {path: '__workbench/idle', element: null},
-            {path: 'knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeBasesPage />)},
-            {path: 'knowledge/:kbId', element: guarded('yaoguang.page.knowledge.kbId', <KnowledgeBasePage />)},
-            {path: 'knowledge/:kbId/wiki/:pageId', element: guarded('yaoguang.page.knowledge.kbId.wiki.pageId', <WikiPage />)},
-            {path: 'assistant/knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeAssistantPage />)},
-            {path: '*', element: <Result status="404" title="404" subTitle="页面不存在" />},
+            {path: '/login', element: <LoginPage />},
+            {
+              path: '/',
+              element: <RequireAuth><AdminLayout workbenchEmbedded /></RequireAuth>,
+              children: [
+                {path: '__workbench/idle', element: null},
+                {path: 'knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeBasesPage />)},
+                {path: 'knowledge/:kbId', element: guarded('yaoguang.page.knowledge.kbId', <KnowledgeBasePage />)},
+                {path: 'knowledge/:kbId/wiki/:pageId', element: guarded('yaoguang.page.knowledge.kbId.wiki.pageId', <WikiPage />)},
+                {path: 'assistant/knowledge', element: guarded('yaoguang.page.knowledge', <KnowledgeAssistantPage />)},
+                {path: '*', element: <Result status="404" title="404" subTitle="页面不存在" />},
+              ],
+            },
           ],
         },
       ],
